@@ -168,6 +168,36 @@ def infer_onnx():
         print(f"{labels[cls_idx]}: {score:.2f}")
 
 
+def infer_trt():
+    import torch_tensorrt
+
+    labels, video = get_labels_and_video()
+    video_as_batch = video.unsqueeze(0).cuda()
+
+    model = torch_tensorrt.runtime.PythonTorchTensorRTModule(
+        Path("model.trt").read_bytes(),
+        input_binding_names=[
+            "video",
+        ],
+        output_binding_names=[
+            "cls",
+        ],
+    )
+
+    import time
+    start_time = time.perf_counter()
+    n_runs = 30
+    for _ in range(n_runs):
+        cls = model(video_as_batch)
+    end_time = time.perf_counter()
+    print(f"Inference runs per sec: {n_runs / (end_time - start_time):.2f}")
+
+    top_cls = torch.topk(cls.squeeze(0), 3)
+    
+    for cls_idx, score in zip(top_cls.indices, top_cls.values):
+        print(f"{labels[cls_idx]}: {score:.2f}")
+
+
 def main():
     action = sys.argv[1]
 
@@ -177,6 +207,8 @@ def main():
         export_onnx()
     elif action == "infer_onnx":
         infer_onnx()
+    elif action == "infer_trt":
+        infer_trt()
     else:
         raise ValueError(f"Unknown action {action}")
 

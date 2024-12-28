@@ -1,9 +1,9 @@
 [project]
-name = "bin-search-is-all-you-need"
-version = "0.1.0"
+name = "vit-trt"
+version = "0.2.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.6"
 dependencies = [
     "onnx>=1.17.0",
     "onnxruntime>=1.17.1",
@@ -11,4 +11,6 @@ dependencies = [
     "setuptools>=75.6.0",
     "timm>=1.0.12",
     "torch>=2.5.0",
+    "torch-tensorrt>=2.5.0; sys_platform == 'linux'",
+    "nvidia-modelopt[all]>=0.21.0; sys_platform == 'linux'",
 ]
