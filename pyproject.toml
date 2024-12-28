@@ -1,0 +1,14 @@
+[project]
+name = "bin-search-is-all-you-need"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "onnx>=1.17.0",
+    "onnxruntime>=1.17.1",
+    "pyav<14.0.0",
+    "setuptools>=75.6.0",
+    "timm>=1.0.12",
+    "torch>=2.5.0",
+]
