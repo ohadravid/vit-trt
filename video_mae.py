@@ -12,8 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
-from timm.models.layers import drop_path, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
+from timm.layers import drop_path, to_2tuple, trunc_normal_
 
 
 def _cfg(url='', **kwargs):
@@ -118,8 +117,7 @@ class CosAttention(nn.Module):
                                   requires_grad=False), self.v_bias))
         qkv = F.linear(input=x, weight=self.qkv.weight, bias=qkv_bias)
         qkv = qkv.reshape(B, N, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[
-            2]  # make torchscript happy (cannot use tensor as tuple)
+        q, k, v = qkv.unbind(0)
 
         attn = (
             F.normalize(q, dim=-1) @ F.normalize(k, dim=-1).transpose(-2, -1))
@@ -179,8 +177,7 @@ class Attention(nn.Module):
                                   requires_grad=False), self.v_bias))
         qkv = F.linear(input=x, weight=self.qkv.weight, bias=qkv_bias)
         qkv = qkv.reshape(B, N, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[
-            2]  # make torchscript happy (cannot use tensor as tuple)
+        q, k, v = qkv.unbind(0)
 
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
@@ -348,6 +345,7 @@ class VisionTransformer(nn.Module):
                  cos_attn=False):
         super().__init__()
         self.num_classes = num_classes
+        self.all_frames = all_frames
         # num_features for consistency with other models
         self.num_features = self.embed_dim = embed_dim
         self.tubelet_size = tubelet_size
@@ -454,7 +452,6 @@ class VisionTransformer(nn.Module):
         return x
 
 
-@register_model
 def vit_small_patch16_224(pretrained=False, **kwargs):
     model = VisionTransformer(
         patch_size=16,
@@ -462,66 +459,6 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
         depth=12,
         num_heads=6,
         mlp_ratio=4,
-        qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
-
-
-@register_model
-def vit_base_patch16_224(pretrained=False, **kwargs):
-    model = VisionTransformer(
-        patch_size=16,
-        embed_dim=768,
-        depth=12,
-        num_heads=12,
-        mlp_ratio=4,
-        qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
-
-
-@register_model
-def vit_large_patch16_224(pretrained=False, **kwargs):
-    model = VisionTransformer(
-        patch_size=16,
-        embed_dim=1024,
-        depth=24,
-        num_heads=16,
-        mlp_ratio=4,
-        qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
-
-
-@register_model
-def vit_huge_patch16_224(pretrained=False, **kwargs):
-    model = VisionTransformer(
-        patch_size=16,
-        embed_dim=1280,
-        depth=32,
-        num_heads=16,
-        mlp_ratio=4,
-        qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
-
-
-@register_model
-def vit_giant_patch14_224(pretrained=False, **kwargs):
-    model = VisionTransformer(
-        patch_size=14,
-        embed_dim=1408,
-        depth=40,
-        num_heads=16,
-        mlp_ratio=48 / 11,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
