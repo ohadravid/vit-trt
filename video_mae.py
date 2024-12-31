@@ -296,25 +296,30 @@ class PatchEmbed(nn.Module):
         return x
 
 
-# sin-cos position encoding
-# https://github.com/jadore801120/attention-is-all-you-need-pytorch/blob/master/transformer/Models.py#L31
-def get_sinusoid_encoding_table(n_position, d_hid):
-    ''' Sinusoid position encoding table '''
+def get_sinusoid_encoding(n_position: int, embed_dims: int) -> torch.Tensor:
+    """Generate sinusoid encoding table.
 
-    # TODO: make it with torch instead of numpy
-    def get_position_angle_vec(position):
-        return [
-            position / np.power(10000, 2 * (hid_j // 2) / d_hid)
-            for hid_j in range(d_hid)
-        ]
+    Sinusoid encoding is a kind of relative position encoding method came from
+    `Attention Is All You Need<https://arxiv.org/abs/1706.03762>`_.
+    Args:
+        n_position (int): The length of the input token.
+        embed_dims (int): The position embedding dimension.
+    Returns:
+        :obj:`torch.FloatTensor`: The sinusoid encoding table of size
+        (1, n_position, embed_dims)
+    """
 
-    sinusoid_table = np.array(
-        [get_position_angle_vec(pos_i) for pos_i in range(n_position)])
-    sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
-    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
+    vec = torch.arange(embed_dims, dtype=torch.float64)
+    vec = (vec - vec % 2) / embed_dims
+    vec = torch.pow(10000, -vec).view(1, -1)
 
-    return torch.tensor(
-        sinusoid_table, dtype=torch.float, requires_grad=False).unsqueeze(0)
+    sinusoid_table = torch.arange(n_position).view(-1, 1) * vec
+    sinusoid_table[:, 0::2].sin_()  # dim 2i
+    sinusoid_table[:, 1::2].cos_()  # dim 2i+1
+
+    sinusoid_table = sinusoid_table.to(torch.float32)
+
+    return sinusoid_table.unsqueeze(0)
 
 
 class VisionTransformer(nn.Module):
@@ -358,16 +363,11 @@ class VisionTransformer(nn.Module):
             embed_dim=embed_dim,
             num_frames=all_frames,
             tubelet_size=tubelet_size)
-        num_patches = self.patch_embed.num_patches
+        self.num_patches = self.patch_embed.num_patches
         self.with_cp = with_cp
 
-        if use_learnable_pos_emb:
-            self.pos_embed = nn.Parameter(
-                torch.zeros(1, num_patches, embed_dim))
-        else:
-            # sine-cosine positional embeddings is on the way
-            self.pos_embed = get_sinusoid_encoding_table(
-                num_patches, embed_dim)
+        pos_embed = get_sinusoid_encoding(self.num_patches, embed_dim)
+        self.register_buffer("pos_embed", pos_embed)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -432,8 +432,8 @@ class VisionTransformer(nn.Module):
         x = self.patch_embed(x)
 
         if self.pos_embed is not None:
-            x = x + self.pos_embed.expand(B, -1, -1).type_as(x).to(
-                x.device).clone().detach()
+            x = x + self.pos_embed
+        
         x = self.pos_drop(x)
 
         for blk in self.blocks:
@@ -454,12 +454,26 @@ class VisionTransformer(nn.Module):
         return x
 
 
-def vit_small_patch16_224(pretrained=False, **kwargs):
+def vit_small_patch16_224(pretrained=False, **kwargs) -> VisionTransformer:
     model = VisionTransformer(
         patch_size=16,
         embed_dim=384,
         depth=12,
         num_heads=6,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+def vit_base_patch16_224(pretrained=False, **kwargs) -> VisionTransformer:
+    model = VisionTransformer(
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
