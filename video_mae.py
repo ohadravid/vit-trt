@@ -1,3 +1,4 @@
+# From: https://github.com/OpenGVLab/VideoMAEv2/blob/master/models/modeling_finetune.py
 # --------------------------------------------------------
 # Based on BEiT, timm, DINO and DeiT code bases
 # https://github.com/microsoft/unilm/tree/master/beit
