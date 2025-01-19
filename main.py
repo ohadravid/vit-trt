@@ -28,7 +28,7 @@ class ResizeVideoToLength(nn.Module):
         return x
 
 
-MAX_SEQ_LEN = 96
+MAX_SEQ_LEN = 16
 
 
 def get_val_transform(
@@ -54,14 +54,9 @@ class HelloViT(nn.Module):
     def forward(self, x):
         B, T, C, H, W = x.shape
 
-        # The model expects [B, C, T, H, W], with T=model.all_frames (16).
-        x = x.reshape(-1, self.model.all_frames, C, H, W)
         x = x.permute(0, 2, 1, 3, 4)
 
         cls = self.model(x)
-
-        cls = cls.reshape(B, -1, cls.shape[-1])
-        cls = cls.mean(dim=1)
 
         cls = F.softmax(cls, dim=1)
         
@@ -99,7 +94,7 @@ def get_model():
 def infer(fast=False):
     model = get_model()
     labels, video = get_labels_and_video()
-    video_as_batch = video.unsqueeze(0)
+    video_as_batch = video.unsqueeze(0).repeat(6, 1, 1, 1, 1)
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -140,7 +135,7 @@ def infer(fast=False):
     end_time = time.perf_counter()
     print(f"Inference runs per sec: {n_runs / (end_time - start_time):.2f} on {device}")
 
-    top_cls = torch.topk(cls.squeeze(0), 3)
+    top_cls = torch.topk(cls[0], 3)
 
     for cls_idx, score in zip(top_cls.indices, top_cls.values):
         print(f"{labels[cls_idx]}: {score:.2f}")
@@ -149,7 +144,7 @@ def infer(fast=False):
 def export_onnx():
     model = get_model()
     labels, video = get_labels_and_video()
-    video_as_batch = video.unsqueeze(0)
+    video_as_batch = video.unsqueeze(0).repeat(6, 1, 1, 1, 1)
 
     onnx_bytes = io.BytesIO()
 
@@ -169,7 +164,7 @@ def export_onnx():
 
 def infer_onnx():
     labels, video = get_labels_and_video()
-    video_as_batch = video.unsqueeze(0)
+    video_as_batch = video.unsqueeze(0).repeat(6, 1, 1, 1, 1)
 
     model_onnx = Path("model.onnx")
     ort_sess = ort.InferenceSession(model_onnx.read_bytes())
@@ -183,7 +178,7 @@ def infer_onnx():
     )
 
     cls = torch.from_numpy(cls)
-    top_cls = torch.topk(cls.squeeze(0), 3)
+    top_cls = torch.topk(cls[0], 3)
 
     for cls_idx, score in zip(top_cls.indices, top_cls.values):
         print(f"{labels[cls_idx]}: {score:.2f}")
@@ -193,7 +188,8 @@ def infer_trt():
     import torch_tensorrt
 
     labels, video = get_labels_and_video()
-    video_as_batch = video.unsqueeze(0).cuda()
+    video_as_batch = video.unsqueeze(0).repeat(6, 1, 1, 1, 1)
+    video_as_batch = video_as_batch.cuda()
 
     model = torch_tensorrt.runtime.PythonTorchTensorRTModule(
         Path("model.trt").read_bytes(),
@@ -213,7 +209,7 @@ def infer_trt():
     end_time = time.perf_counter()
     print(f"Inference runs per sec: {n_runs / (end_time - start_time):.2f}")
 
-    top_cls = torch.topk(cls.squeeze(0), 3)
+    top_cls = torch.topk(cls[0], 3)
     
     for cls_idx, score in zip(top_cls.indices, top_cls.values):
         print(f"{labels[cls_idx]}: {score:.2f}")
