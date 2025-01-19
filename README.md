@@ -58,7 +58,7 @@ uv run python main.py infer_trt
 Checking with different TensorRT versions can be done using `docker` and [NVIDIA's `pytorch` images](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch):
 
 ```bash
-$ docker run --gpus all --rm -it -v $(pwd):/code nvcr.io/nvidia/pytorch:24.12-py3 bash
+$ docker run --gpus all --rm -it -v $(pwd):/code -w /code nvcr.io/nvidia/pytorch:24.12-py3 bash
 $ root@cd60802e9604:/code# pip install "onnxruntime>=1.17.1" "pyav<14.0.0" "timm>=1.0.12"
 $ root@cd60802e9604:/code# python ./main.py export_onnx && python ./build_trt.py  && python ./main.py infer_trt
 ```
