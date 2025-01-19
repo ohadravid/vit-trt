@@ -194,7 +194,7 @@ class Attention(nn.Module):
         x = self.proj_drop(x)
         return x
 
-from alternative_attn_modules import AttentionUsingScaledDotProduct, AttentionUsingMHAForward, AttentionUsingMHALayer
+from alternative_attn_modules import ExplicitAttention, AttentionUsingScaledDotProduct, AttentionUsingMHAForward, AttentionUsingMHALayer
 
 ## Uncomment and change this to use the desired attention module
 # Attention = AttentionUsingMHALayer

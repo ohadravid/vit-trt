@@ -37,6 +37,9 @@ opening door: 0.01
 Note: be sure to use an Attention layer that works with TensorRT.
 
 ```bash
+# Use faster settings for torch inference (half precision, torch.compile, ..)
+uv run python main.py infer --fast
+
 # Export the model to an ONNX file
 uv run python main.py export_onnx
 

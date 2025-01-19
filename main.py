@@ -46,7 +46,7 @@ def get_val_transform(
     )
 
 
-class VideoMAEBinSearch(nn.Module):
+class HelloViT(nn.Module):
     def __init__(self, model: VisionTransformer):
         super().__init__()
         self.model = model
@@ -88,7 +88,7 @@ def get_model():
 
     video_mae_model.load_state_dict(ckpt, strict=False)
 
-    model = VideoMAEBinSearch(video_mae_model)
+    model = HelloViT(video_mae_model)
 
     model = model.eval()
 
@@ -96,26 +96,47 @@ def get_model():
 
 
 @torch.inference_mode()
-def infer():
+def infer(fast=False):
     model = get_model()
     labels, video = get_labels_and_video()
     video_as_batch = video.unsqueeze(0)
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
+        n_runs = 60
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
+        n_runs = 10
     else:
         device = torch.device("cpu")
-
+        n_runs = 5
+    
     model = model.to(device)
     video_as_batch = video_as_batch.to(device)
 
+    if fast:
+        print("Setting matmul precision to medium")
+        torch.set_float32_matmul_precision('medium')
+
+        print("Using half precision")
+        model = model.half()
+        video_as_batch = video_as_batch.half()
+
+        if device.type == "cuda":
+            print("Compiling model")
+            model = torch.compile(model)
+            _ = model(video_as_batch)
+
     import time
     start_time = time.perf_counter()
-    n_runs = 3
+    
     for _ in range(n_runs):
         cls = model(video_as_batch)
+        
+        # A complied model needs to be synchronized in order to measure the inference time.
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+    
     end_time = time.perf_counter()
     print(f"Inference runs per sec: {n_runs / (end_time - start_time):.2f} on {device}")
 
@@ -186,7 +207,7 @@ def infer_trt():
 
     import time
     start_time = time.perf_counter()
-    n_runs = 30
+    n_runs = 60
     for _ in range(n_runs):
         cls = model(video_as_batch)
     end_time = time.perf_counter()
@@ -202,7 +223,8 @@ def main():
     action = sys.argv[1]
 
     if action == "infer":
-        infer()
+        fast = len(sys.argv) > 2 and sys.argv[2] == "--fast"
+        infer(fast)
     elif action == "export_onnx":
         export_onnx()
     elif action == "infer_onnx":
