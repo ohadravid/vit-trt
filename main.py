@@ -141,12 +141,21 @@ def infer(fast=False):
         print(f"{labels[cls_idx]}: {score:.2f}")
 
 
-def export_onnx():
+def export_onnx(dynamic=False):
     model = get_model()
     labels, video = get_labels_and_video()
     video_as_batch = video.unsqueeze(0).repeat(6, 1, 1, 1, 1)
 
     onnx_bytes = io.BytesIO()
+
+    if dynamic:
+        print("Exporting model with dynamic axes")
+        dynamic_axes = {
+            "video": {0: "B"},
+            "cls": {0: "B"},
+        }
+    else:
+        dynamic_axes = None
 
     torch.onnx.export(
         model,
@@ -157,6 +166,7 @@ def export_onnx():
         do_constant_folding=True,
         input_names=["video"],
         output_names=["cls"],
+        dynamic_axes=dynamic_axes,
     )
 
     Path("model.onnx").write_bytes(onnx_bytes.getvalue())
@@ -222,7 +232,8 @@ def main():
         fast = len(sys.argv) > 2 and sys.argv[2] == "--fast"
         infer(fast)
     elif action == "export_onnx":
-        export_onnx()
+        dynamic = len(sys.argv) > 2 and sys.argv[2] == "--dynamic"
+        export_onnx(dynamic)
     elif action == "infer_onnx":
         infer_onnx()
     elif action == "infer_trt":
